@@ -1,0 +1,52 @@
+services:
+  # Servicio de la Base de Datos PostgreSQL
+  postgres:
+    image: postgres:16-alpine # Usamos una imagen ligera y estable de Postgres
+    container_name: db_postgres
+    restart: always
+    environment:
+      # Carga las credenciales desde el archivo .env
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    ports:
+      # Mapea el puerto del host (definido en .env) al puerto interno de postgres (5432)
+      - "${DB_PORT}:5432"
+    volumes:
+      # Persiste los datos de la base de datos para que no se pierdan al reiniciar el contenedor
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER} -d ${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - micro-users-net
+
+  # Servicio de la Aplicación Spring Boot
+  app:
+    build: . # Construye la imagen usando el Dockerfile en el directorio actual
+    container_name: micro-users-app
+    restart: always
+    depends_on:
+      postgres:
+        condition: service_healthy # La app solo iniciará cuando la BD esté lista
+    environment:
+      # Configuración para que Spring se conecte a la BD dentro de la red de Docker
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD}
+      SERVER_PORT: ${APP_PORT} # Indica a Spring que corra en el puerto 8081
+    ports:
+      - "${APP_PORT}:${APP_PORT}" # Expone el puerto 8081 de la app en tu máquina
+    networks:
+      - micro-users-net
+
+# Define el volumen para persistir los datos de la BD
+volumes:
+  postgres_data:
+
+# Define la red para que los contenedores se comuniquen entre sí
+networks:
+  micro-users-net:
+    driver: bridge

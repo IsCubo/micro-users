@@ -1,0 +1,8 @@
+.idea/
+.mvn/
+target/
+*.log
+
+# Ignorar archivos de Git
+.git
+.gitignore
